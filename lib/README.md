@@ -1,4 +1,4 @@
-#PrismaCloud Alert report email
+#Prisma Cloud Alert report email
 
 Version: *1.0*
 Author: *Eddie Beuerlein*
