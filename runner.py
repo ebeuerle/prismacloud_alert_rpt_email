@@ -139,7 +139,7 @@ class PCAlertEmailReport():
 
         for policy, count in top5risks.items():
 
-            body4 = f"{policy}:\t\t\t\t{count:>5}\n"
+            body4 = f"{policy}:{count}\n"
             body += body4
 
         self.email_send.send_email('Daily Risk Summary', body)
