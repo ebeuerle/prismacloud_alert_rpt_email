@@ -38,7 +38,7 @@ Script pulls tenant and account level details on new and high risk counts for al
 
 3. Navigate to *lib/email_helper.py:
 * Set from address: self.from_address = "XXXX@gmail.com"
-* Set to address: self.to_address = "XXXXX@gmail.com"
+* Set to address (multiples can be specified separated by commas): self.to_address = "XXXXX@gmail.com"
 * Set mail server: self.email_srv = "smtp.gmail.com"
 * Set mail server port: self.email_srv_port = "587"
 * Set mail login usernname: self.username = "XXXXXXX@gmail.com"
