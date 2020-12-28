@@ -1,4 +1,5 @@
 import lib
+import sys
 from collections import defaultdict
 
 
@@ -8,6 +9,13 @@ class PCAlertEmailReport():
         self.pc_sess = lib.PCSession(self.config.pc_user, self.config.pc_pass, self.config.pc_cust,
                                      self.config.pc_api_base)
         self.email_send = lib.EmailHelper()
+        if self.config.pc_user is None:
+            print("No access key specified, please fix and re-run script")
+            sys.exit()
+        if self.config.pc_pass is None:
+            print("No secret key specified, please fix and re-run script")
+            sys.exit()
+
 
     def map_callback(self):
         if self.config.pc_api_base == "api.prismacloud.io":
@@ -18,6 +26,58 @@ class PCAlertEmailReport():
             callback_base = "app3.prismacloud.io"
 
         return callback_base
+
+    def build_email_list(self):
+        #data structure - {email address: [ acct id1, acct id2, acct id3] }
+        email_list = defaultdict(list)
+        self.pc_sess.authenticate_client()
+
+        #collect all roles
+        self.url = "https://" + self.config.pc_api_base + "/user/role"
+        roles = self.pc_sess.client.get(self.url)
+
+        #collect account groups
+        self.url = "https://" + self.config.pc_api_base + "/cloud/group"
+        acct_grps = self.pc_sess.client.get(self.url)
+
+        # pull list of active accounts
+        self.url = "https://" + self.config.pc_api_base + "/cloud/name?onlyActive=true"
+        activeaccts = self.pc_sess.client.get(self.url)
+
+        allacctids = []
+        for acct in activeaccts.json():
+            allacctids.append(acct['id'])
+
+        for role in roles.json():
+            if role['roleType'] == "Build and Deploy Security":
+                continue
+            elif role['roleType'] != "System Admin":
+                for email in role['associatedUsers']:
+                    if email in email_list.keys():
+                        for acct in role['accountGroupIds']:
+                            for target in acct_grps.json():
+                                if target['id'] == acct:
+                                    if target['accountIds']:
+                                        email_list[email].extend(target['accountIds'])
+                    else:
+                        for acct in role['accountGroupIds']:
+                            for target in acct_grps.json():
+                                if target['id'] == acct:
+                                    if target['accountIds']:
+                                        email_list[email] = target['accountIds']
+            else:
+                for email in role['associatedUsers']:
+                    if email in email_list.keys():
+                        email_list[email].extend(allacctids)
+                    else:
+                        email_list[email].extend(allacctids)
+
+        # post-processing - de-dup values
+        for key,value in email_list.items():
+            email_list[key] = list(set(value))
+
+
+        return email_list
 
     def gather_toplevel(self):
 
@@ -96,7 +156,7 @@ class PCAlertEmailReport():
         return toprisk
 
 
-    def build_email(self, toplevel, acctlevel, summarylevel, callback_base):
+    def build_email(self, toplevel, acctlevel, summarylevel, callback_base, email_addr):
         top = toplevel
         accts = acctlevel
         risks = summarylevel
@@ -142,8 +202,16 @@ class PCAlertEmailReport():
             body4 = f"{policy}:{count}\n"
             body += body4
 
-        self.email_send.send_email('Daily Risk Summary', body)
+        self.email_send.send_email('Daily Risk Summary', body, email_addr)
 
+    def build_email_acct_list(self, toplevel_data, acctlevel_data, summarylevel_data, callback, email_list):
+        new_accts = defaultdict(dict) # To store a revised list of accounts per email address
+        for emailaddr, acctids in email_list.items():
+            for acct in acctids:
+                for acct_id,data in acctlevel_data.items():
+                    if acct == acct_id:
+                        new_accts[acct_id].update(data)
+            self.build_email(toplevel_data, new_accts, summarylevel_data, callback, emailaddr)
 
     def run(self):
         callback = self.map_callback()
@@ -153,8 +221,12 @@ class PCAlertEmailReport():
         acctlevel_data = self.gather_acctlevel()
         print("Gathering summary level risk data from tenant...")
         summarylevel_data = self.gather_top_risks()
+        print("Constructing email recipient list")
+        email_list = self.build_email_list()
         print("Building and sending email...")
-        self.build_email(toplevel_data, acctlevel_data, summarylevel_data, callback)
+        self.build_email_acct_list(toplevel_data, acctlevel_data, summarylevel_data, callback, email_list)
+
+
 
 def main():
     PCAlertEmailReport().run()

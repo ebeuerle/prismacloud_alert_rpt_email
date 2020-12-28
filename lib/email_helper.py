@@ -6,16 +6,15 @@ from email.mime.multipart import MIMEMultipart
 class EmailHelper(object):
     def __init__(self):
         self.msg = MIMEMultipart()
-        self.from_address = "eddie.beuerlein@gmail.com"
-        self.to_address = "eddie.beuerlein@gmail.com"
-        self.email_srv = "smtp.gmail.com"
+        self.from_address = "XXXXX"
+        self.email_srv = "XXXXX"
         self.email_srv_port = "587"
-        self.username = "eddie.beuerlein@gmail.com"
-        self.password = "XXXXXXXX"
+        self.username = "XXXXX"
+        self.password = "XXXXX"
 
-    def send_email(self, subject, bodycontent):
+    def send_email(self, subject, bodycontent, tolist):
         self.msg['From'] = self.from_address
-        self.msg['To'] = self.to_address
+        self.msg['To'] = tolist
         self.msg['Subject'] = subject
 
         self.msg.attach(MIMEText(bodycontent, 'plain'))
@@ -28,5 +27,5 @@ class EmailHelper(object):
             server = smtplib.SMTP(self.email_srv, self.email_srv_port)
         server.login(self.username, self.password)
         text = self.msg.as_string()
-        server.sendmail(self.from_address, self.to_address.split(','), text)
+        server.sendmail(self.from_address, tolist.split(','), text)
         server.quit()
